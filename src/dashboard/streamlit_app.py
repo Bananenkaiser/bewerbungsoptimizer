@@ -111,8 +111,8 @@ def _render_analyse_tab(config: dict) -> None:
     col_input, col_info = st.columns([2, 1])
 
     with col_input:
-        job_title = st.text_input("Jobtitel (optional)", key="input_job_title")
-        company = st.text_input("Unternehmen (optional)", key="input_company")
+        job_title = st.text_input("Jobtitel (optional – wird von KI extrahiert)", key="input_job_title")
+        company = st.text_input("Unternehmen (optional – wird von KI extrahiert)", key="input_company")
         description = st.text_area(
             "Stellenausschreibung",
             height=400,
@@ -450,18 +450,18 @@ def main() -> None:
     if "save_success" not in st.session_state:
         st.session_state["save_success"] = False
 
-    tab_statistik, tab_analyse, tab_stellen, tab_profil = st.tabs(
-        ["Übersicht", "Analyse", "Gespeicherte Stellen", "Mein Profil"]
+    tab_statistik, tab_stellen, tab_analyse, tab_profil = st.tabs(
+        ["Übersicht", "Gespeicherte Stellen", "Analyse", "Mein Profil"]
     )
 
     with tab_statistik:
         _render_statistik_tab()
 
-    with tab_analyse:
-        _render_analyse_tab(config)
-
     with tab_stellen:
         _render_stellen_tab()
+
+    with tab_analyse:
+        _render_analyse_tab(config)
 
     with tab_profil:
         _render_profil_tab(config)

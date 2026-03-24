@@ -26,7 +26,11 @@ ANALYSIS_PROMPT = """Analysiere die Passung zwischen dem folgenden Lebenslauf un
 ## Stellenausschreibung
 {job_content}
 
-Erstelle eine strukturierte Analyse mit folgenden Abschnitten:
+Beginne deine Antwort immer mit diesen zwei Zeilen (extrahiert aus der Stellenausschreibung):
+**Stelle:** [Jobtitel]
+**Unternehmen:** [Unternehmensname]
+
+Erstelle danach eine strukturierte Analyse mit folgenden Abschnitten:
 
 ### 1. Gesamtbewertung
 - Passungsgrad in Prozent (0–100%)
@@ -78,6 +82,18 @@ def _pdf_to_text(cv_path: Path) -> str:
     from pypdf import PdfReader
     reader = PdfReader(cv_path)
     return "\n".join(page.extract_text() or "" for page in reader.pages)
+
+
+def _extract_metadata(text: str) -> tuple[str, str]:
+    """Extrahiert Jobtitel und Unternehmen aus dem KI-Antwort-Header."""
+    title, company = "", ""
+    m = re.search(r"\*\*Stelle:\*\*\s*(.+)", text)
+    if m:
+        title = m.group(1).strip()
+    m = re.search(r"\*\*Unternehmen:\*\*\s*(.+)", text)
+    if m:
+        company = m.group(1).strip()
+    return title, company
 
 
 def _extract_fit_score(text: str) -> int:
@@ -296,12 +312,13 @@ def analyze_job(
         model_used = f"Anthropic – {ANTHROPIC_MODEL}"
 
     fit_score = _extract_fit_score(full_text)
+    extracted_title, extracted_company = _extract_metadata(full_text)
 
     return AnalysisResult(
         fit_score=fit_score,
         full_analysis=full_text,
-        job_title=job_title,
-        company=company,
+        job_title=job_title or extracted_title,
+        company=company or extracted_company,
         input_tokens=input_tokens,
         output_tokens=output_tokens,
         model_used=model_used,

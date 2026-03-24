@@ -21,6 +21,7 @@ env/
 .env
 .env.*
 *.local
+.claude/
 
 # Logs
 *.log
@@ -33,6 +34,7 @@ data/mongodb/
 
 # Persönliche Daten
 data/persönliche_informationen/
+PLAN.md
 
 # IDE
 .vscode/
