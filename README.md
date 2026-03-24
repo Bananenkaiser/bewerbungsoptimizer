@@ -1,4 +1,4 @@
-# Bewerbungsoptimizer
+# JobPilot
 
 > A personal job application assistant that crawls job postings, analyzes CV fit using LLMs, and tracks the entire application process — all through a self-hosted web dashboard.
 

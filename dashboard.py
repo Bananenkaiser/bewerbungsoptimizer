@@ -1,4 +1,4 @@
-"""Streamlit-Dashboard Starter für den Bewerbungsoptimizer."""
+"""Streamlit-Dashboard Starter für JobPilot."""
 
 import sys
 from pathlib import Path

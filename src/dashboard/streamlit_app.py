@@ -1,4 +1,4 @@
-"""Streamlit-Dashboard für den Bewerbungsoptimizer."""
+"""Streamlit-Dashboard für JobPilot."""
 
 import hashlib
 import os
@@ -16,7 +16,7 @@ ROOT = Path(__file__).parent.parent.parent
 
 load_dotenv(ROOT / ".env")
 
-from src.analyzer.job_matcher import AnalysisResult, analyze_job, create_candidate_profile, extract_github_skills, suggest_cv_improvements
+from src.analyzer.job_matcher import AnalysisResult, analyze_job, create_candidate_profile, extract_github_skills, suggest_cv_improvements, suggest_general_improvements
 from src.storage.database import JOBS_COLLECTION, get_session, init_db
 from src.storage.models import Job, JobStatus
 
@@ -870,6 +870,16 @@ def _render_profil_tab(config: dict) -> None:
         st.divider()
         st.subheader("Extrahierte Informationen")
         _render_profil_overview(profil_text, profile_path)
+
+        # ── Allgemeine Verbesserungsvorschläge ───────────────────────────────
+        st.divider()
+        st.subheader("Allgemeine Verbesserungsvorschläge")
+        if st.button("Verbesserungsvorschläge generieren", key="btn_general_improvements"):
+            with st.spinner("Analysiere Profil …"):
+                result = suggest_general_improvements(profile_path, config)
+                st.session_state["general_improvements"] = result
+        if st.session_state.get("general_improvements"):
+            st.markdown(st.session_state["general_improvements"])
     else:
         st.divider()
         st.info("Noch keine Informationen extrahiert. Lebenslauf hochladen und Profil erstellen.")
@@ -879,11 +889,11 @@ def main() -> None:
     config = _init()
 
     st.set_page_config(
-        page_title="Bewerbungsoptimizer",
+        page_title="JobPilot",
         page_icon="📋",
         layout="wide",
     )
-    st.title("Bewerbungsoptimizer")
+    st.title("JobPilot")
 
     if "analysis_done" not in st.session_state:
         st.session_state["analysis_done"] = False

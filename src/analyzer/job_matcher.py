@@ -140,6 +140,42 @@ Für jedes Keyword: wo genau im Lebenslauf einbauen und wie es sich natürlich i
 Worauf sollte das Anschreiben besonders eingehen?
 - ..."""
 
+GENERAL_IMPROVEMENT_PROMPT = """Du bist ein erfahrener Karriereberater. Analysiere das folgende Kandidatenprofil und erstelle allgemeine, stellenunabhängige Verbesserungsvorschläge für Lebenslauf und Anschreiben.
+
+## Kandidatenprofil
+{profile_content}
+
+### Allgemeine Lebenslauf-Optimierungen
+
+#### Stärken (was bereits gut ist)
+- [was im Profil positiv auffällt]
+
+#### Verbesserungspotenzial
+Für jede Schwäche: konkrete Stelle im Lebenslauf benennen und eine verbesserte Version zeigen.
+- **[Schwäche, z.B. unklare Formulierung / fehlende Kennzahl]:** „[exakte Originalformulierung aus dem Profil]" → „[verbesserte Version]"
+
+#### Fehlende Elemente für typische {field}-Stellen
+- [was in diesem Bereich üblicherweise erwartet wird, aber fehlt]
+
+#### Formatierungs- & Struktur-Tipps
+- [Hinweise zu Aufbau, Länge, Lesbarkeit]
+
+---
+
+### Allgemeine Anschreiben-Tipps für dein Profil
+
+#### Einstieg & Aufhänger
+[Wie sollte ein überzeugender Einstieg für jemanden mit diesem Hintergrund aussehen? Konkretes Beispiel.]
+
+#### Kernbotschaft
+[Was ist dein stärkstes Argument für Arbeitgeber — was sollte immer im Anschreiben stehen?]
+
+#### Häufige Fehler vermeiden
+- [typische Schwachstellen für dieses Profil im Anschreiben]
+
+#### Muster-Eröffnungssatz
+[Ein konkreter Beispielsatz als Vorlage]"""
+
 GITHUB_PROMPT = """Analysiere die folgenden GitHub-Projekte eines Entwicklers und extrahiere daraus ein vollständiges Bild seiner technischen Fähigkeiten.
 
 ## GitHub-Projekte (READMEs)
@@ -437,6 +473,15 @@ def suggest_cv_improvements(job_description: str, profile_path: Path, config: di
         profile_content=profile_text,
         job_content=job_description,
     )
+    return _call_llm(prompt, config)
+
+
+def suggest_general_improvements(profile_path: Path, config: dict | None) -> str:
+    """Allgemeine, stellenunabhängige Verbesserungsvorschläge für CV und Anschreiben."""
+    profile_text = profile_path.read_text(encoding="utf-8")
+    field_match = re.search(r"\*\*Fachgebiet:\*\*\s*(.+)", profile_text)
+    field = field_match.group(1).strip() if field_match else "IT/Data-Science"
+    prompt = GENERAL_IMPROVEMENT_PROMPT.format(profile_content=profile_text, field=field)
     return _call_llm(prompt, config)
 
 
