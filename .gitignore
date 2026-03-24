@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+pip-wheel-metadata/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Environment variables
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+logs/
+
+# Data & Datenbanken
+data/jobs/
+data/jobs.db
+data/mongodb/
+
+# Persönliche Daten
+data/persönliche_informationen/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Docker
+.dockerignore

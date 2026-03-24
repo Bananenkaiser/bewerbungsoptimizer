@@ -1,0 +1,74 @@
+# Indeed Job Tracker – Suchprofile
+# Jedes Profil definiert eine Suche inkl. Filterregeln und Benachrichtigungseinstellungen.
+# Hinweis: Der filters-Block wird von der Filter-Engine ausgewertet (noch in Entwicklung).
+# Aktuell wirken nur: keywords, location, radius_km, max_age_days, job_type.
+
+profiles:
+  - name: "data_scientist_kleve"
+    keywords: "Data Scientist"
+    location: "47533"
+    radius_km: 100
+    max_age_days: 14
+    # job_type: "fulltime"   # deaktiviert – schränkt RSS-Ergebnisse stark ein
+    filters:
+      excluded_keywords:
+        - "Praktikum"
+        - "Werkstudent"
+        - "Trainee"
+        - "Internship"
+      excluded_companies:
+        - "Hays"
+        - "Randstad"
+        - "Adecco"
+        - "ManpowerGroup"
+      min_description_length: 200
+    notification:
+      email: false
+      desktop: true
+      min_score: 0.5
+
+  - name: "data_analyst_kleve"
+    keywords: "Data Analyst"
+    location: "47533"
+    radius_km: 100
+    max_age_days: 14
+    # job_type: "fulltime"   # deaktiviert – schränkt RSS-Ergebnisse stark ein
+    filters:
+      excluded_keywords:
+        - "Praktikum"
+        - "Werkstudent"
+        - "Trainee"
+        - "Internship"
+      excluded_companies:
+        - "Hays"
+        - "Randstad"
+        - "Adecco"
+        - "ManpowerGroup"
+      min_description_length: 200
+    notification:
+      email: false
+      desktop: true
+      min_score: 0.5
+
+  - name: "machine_learning_kleve"
+    keywords: "Machine Learning Engineer"
+    location: "47533"
+    radius_km: 100
+    max_age_days: 14
+    # job_type: "fulltime"   # deaktiviert – schränkt RSS-Ergebnisse stark ein
+    filters:
+      excluded_keywords:
+        - "Praktikum"
+        - "Werkstudent"
+        - "Trainee"
+        - "Internship"
+      excluded_companies:
+        - "Hays"
+        - "Randstad"
+        - "Adecco"
+        - "ManpowerGroup"
+      min_description_length: 200
+    notification:
+      email: false
+      desktop: true
+      min_score: 0.5

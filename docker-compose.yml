@@ -1,0 +1,34 @@
+services:
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: jobtracker
+    volumes:
+      # HOST-Bind-Mount: Daten liegen unter ./data/mongodb — überleben rebuild + docker system prune
+      - ./data/mongodb:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    env_file:
+      - .env
+    extra_hosts:
+      # Ermöglicht Zugriff auf LM Studio (und andere lokale Dienste) vom Container aus
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # CV-PDF, me.md, Analysen, Logs – alles unter ./data auf dem Host
+      - ./data:/app/data
+      # Config live vom Host – Änderungen wirken ohne Rebuild
+      - ./config:/app/config
+    # Standard: Scheduler dauerhaft laufen lassen
+    # Für Einzel-Crawl: docker compose run app python main.py run
+    command: ["python", "main.py", "scheduler"]

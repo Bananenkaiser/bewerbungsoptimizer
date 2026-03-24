@@ -1,0 +1,47 @@
+# Indeed Job Tracker – Hauptkonfiguration
+
+database:
+  uri: "mongodb://localhost:27017/jobtracker"   # lokal; im Container via .env überschrieben
+  name: "jobtracker"
+
+cv:
+  path: "data/persönliche_informationen/Dominik-Tisleric-CV.pdf"
+  me_path: "data/persönliche_informationen/me.md"
+
+analyzer:
+  # "anthropic" = Claude API | "lmstudio" = lokales LM Studio
+  backend: "lmstudio"
+  lmstudio_url: "http://192.168.178.47:1234/v1"
+  lmstudio_model: "local-model"   # Name des geladenen Modells in LM Studio
+
+scheduler:
+  crawl_interval_hours: 2
+  crawl_window_start: 8    # 08:00 Uhr
+  crawl_window_end: 18     # 18:00 Uhr
+  crawl_weekdays_only: true
+  digest_time: "08:00"
+  cleanup_day: "sunday"
+  cleanup_time: "02:00"
+  cleanup_max_age_days: 60
+
+rate_limiting:
+  min_delay_seconds: 5
+  max_delay_seconds: 15
+
+notifications:
+  email:
+    enabled: false
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    smtp_user: ""
+    # Passwort über Umgebungsvariable EMAIL_PASSWORD
+    sender: ""
+    recipient: ""
+    digest_mode: true
+
+  desktop:
+    enabled: true
+
+logging:
+  level: "INFO"
+  file: "data/jobtracker.log"
