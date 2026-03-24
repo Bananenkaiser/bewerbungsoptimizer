@@ -68,7 +68,11 @@ Job hunting generates a lot of noise. This tool cuts through it:
 **Analysis**
 - Fit score with reasoning (0–100 %)
 - Candidate level vs. required level assessment (Junior / Mid / Senior / Lead)
-- Strengths, gaps, and concrete CV improvement suggestions per job posting
+- Strengths and structured gap analysis per job posting:
+  - Missing tools & technologies (bulleted list)
+  - Missing experience & knowledge areas (bulleted list)
+  - Other gaps: soft skills, certificates, languages, domain experience (bulleted list)
+- Concrete CV improvement suggestions per gap
 - Extracts job title and company automatically from the posting text
 
 **Candidate profile**

@@ -40,7 +40,8 @@ Erstelle danach eine strukturierte Analyse mit folgenden Abschnitten:
 - Kurze Begründung (2–3 Sätze)
 
 ### 2. Level-Einschätzung
-- Begründe, warum du den Kandidaten als [Level] einschätzt (Berufserfahrung in Jahren, Verantwortungsbereiche, Technologietiefe).
+- Begründe, warum du den Kandidaten als [Level] einschätzt.
+- WICHTIG: Zähle als "Berufserfahrung im Fachgebiet" ausschließlich Stellen im IT/Data-Science-Bereich nach dem Studienabschluss. Bundeswehr/Militärdienst zählt NICHT als fachliche Berufserfahrung, auch wenn er im Lebenslauf unter "Berufserfahrung" steht – er ist Wehrdienst, keine Fachkarriere. Studiumsprojekte und Abschlussarbeiten zählen ebenfalls nicht als Berufserfahrung.
 - Passt das Level zur Stelle? Wenn nicht: wie groß ist die Abweichung und wie wirkt sie sich aus?
 
 ### 3. Stärken (was passt gut)
@@ -48,6 +49,18 @@ Liste die konkreten Übereinstimmungen zwischen Lebenslauf und Stelle auf.
 
 ### 4. Lücken (was fehlt oder ist schwach)
 Liste die Anforderungen der Stelle, die im Lebenslauf fehlen oder unzureichend dargestellt sind.
+
+#### Fehlende Tools & Technologien
+Welche konkreten Tools, Frameworks oder Technologien werden in der Ausschreibung gefordert oder erwartet, die im Profil des Kandidaten **nicht** vorkommen?
+- [Tool/Technologie – z.B. Kubernetes, dbt, Terraform]
+
+#### Fehlende Erfahrungen & Kenntnisse
+Welche fachlichen Erfahrungen, Methoden oder Kenntnisgebiete werden erwartet, die beim Kandidaten **fehlen oder unzureichend** belegt sind?
+- [Erfahrung/Kenntnis – z.B. Cloud-Infrastruktur, MLOps, Produktionsdeployments]
+
+#### Sonstige Lücken
+Weitere Anforderungen (Soft Skills, Zertifikate, Sprachkenntnisse, Branchenerfahrung etc.), die nicht erfüllt sind:
+- [Sonstige Lücke]
 
 ### 5. Konkrete Lebenslauf-Optimierungen für diese Stelle
 Zeige für jede Lücke/Schwäche **konkret**, was ich im Lebenslauf ändern oder ergänzen sollte.
@@ -71,7 +84,7 @@ Erstelle das Profil exakt in diesem Format (Markdown). Jeder Listenpunkt steht a
 
 **Fachgebiet:** [z.B. Data Science, Backend-Entwicklung, ML Engineering]
 
-**Berufserfahrung:** [X Jahre, kurze Zusammenfassung der Stationen]
+**Berufserfahrung:** [NUR Stellen im IT/Data-Science-Fachbereich nach dem Studienabschluss in Monaten/Jahren. Bundeswehr/Militärdienst zählt hier NICHT, auch wenn er im Lebenslauf unter "Berufserfahrung" steht – separate Erwähnung unter Besonderheiten.]
 
 **Kernkompetenzen:**
 - [eine Kompetenz pro Zeile]
@@ -119,8 +132,9 @@ Für jede kritische Änderung:
 - ...
 
 #### Keywords für ATS-Systeme
-Relevante Keywords aus der Ausschreibung, die im Lebenslauf vorkommen sollten:
-- [Keyword]
+Relevante Keywords aus der Ausschreibung, die im Lebenslauf vorkommen sollten, damit ATS-Systeme eine höhere Trefferquote erzielen.
+Für jedes Keyword: wo genau im Lebenslauf einbauen und wie es sich natürlich in den Text integrieren lässt.
+- **[Keyword]** → Einbauen in: [z.B. Skills-Abschnitt / Berufserfahrung bei Stelle X / Zusammenfassung] — Beispiel: „[kurzer Beispielsatz oder Formulierungsvorschlag]"
 
 #### Hinweise fürs Anschreiben
 Worauf sollte das Anschreiben besonders eingehen?

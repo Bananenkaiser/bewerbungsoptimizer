@@ -426,13 +426,63 @@ def _render_stellen_tab() -> None:
         st.success("Bewerbungsverlauf gespeichert.")
         st.rerun()
 
+    # Neu analysieren
+    description = doc.get("description", "")
+    if description:
+        st.divider()
+        col_reanalyse, col_info = st.columns([2, 3])
+        with col_reanalyse:
+            if st.button("Mit aktuellem Profil neu analysieren", key=f"reanalyse_{jid}", type="primary"):
+                config = _init()
+                cv_cfg = config.get("cv", {})
+                cv_path = ROOT / cv_cfg.get("path", "")
+                me_path_str = cv_cfg.get("me_path", "")
+                me_path = ROOT / me_path_str if me_path_str else None
+                profile_str = cv_cfg.get("profile_path", "")
+                profile_path = ROOT / profile_str if profile_str else None
+                with st.spinner("KI-Analyse läuft... (kann 30–120 Sekunden dauern)"):
+                    result = analyze_job(
+                        job_description=description,
+                        cv_path=cv_path,
+                        me_path=me_path,
+                        job_title=doc.get("title", ""),
+                        company=doc.get("company", ""),
+                        stream_output=False,
+                        config=config,
+                        profile_path=profile_path if (profile_path and profile_path.exists()) else None,
+                    )
+                # Ergebnis in DB überschreiben
+                with get_session() as db:
+                    db[JOBS_COLLECTION].update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {
+                            "score": float(result.fit_score) if result.fit_score >= 0 else None,
+                            "full_analysis": result.full_analysis,
+                            "model_used": result.model_used,
+                            "input_tokens": result.input_tokens,
+                            "output_tokens": result.output_tokens,
+                            "candidate_level": result.candidate_level,
+                            "job_level": result.job_level,
+                        }},
+                    )
+                st.success(f"Neu analysiert – Score: {result.fit_score}%")
+                st.rerun()
+        with col_info:
+            config = _init()
+            profile_str = config.get("cv", {}).get("profile_path", "")
+            profile_path = ROOT / profile_str if profile_str else None
+            if profile_path and profile_path.exists():
+                st.caption("Verwendet das aktuelle Kandidatenprofil.")
+            else:
+                st.caption("Kein Kandidatenprofil vorhanden – Analyse nutzt den rohen Lebenslauf.")
+
     full_analysis = doc.get("full_analysis")
     if full_analysis:
         st.markdown("### Analyse")
         st.markdown(full_analysis)
-    elif doc.get("description"):
+    elif description:
         with st.expander("Stellenbeschreibung"):
-            st.text(doc["description"][:3000])
+            st.text(description[:3000])
 
 
 def _parse_profile(text: str) -> dict:
@@ -675,8 +725,22 @@ def _render_profil_tab(config: dict) -> None:
     elif active == "me":
         with st.container(border=True):
             st.caption("Ergänzt deinen Lebenslauf mit persönlichem Kontext für die KI-Analyse.")
-            current_text = me_path.read_text(encoding="utf-8") if me_path.exists() else ""
-            new_text = st.text_area("Inhalt", value=current_text, height=300, key="me_md_editor")
+
+            uploaded_me = st.file_uploader(
+                "Datei hochladen (.md oder .txt) – überschreibt den aktuellen Inhalt",
+                type=["md", "txt"],
+                key="me_uploader",
+            )
+            if uploaded_me:
+                file_text = uploaded_me.read().decode("utf-8", errors="replace")
+                st.session_state["me_md_uploaded"] = file_text
+                st.rerun()
+
+            initial_text = st.session_state.pop("me_md_uploaded", None)
+            if initial_text is None:
+                initial_text = me_path.read_text(encoding="utf-8") if me_path.exists() else ""
+
+            new_text = st.text_area("Inhalt", value=initial_text, height=300, key="me_md_editor")
             if st.button("Speichern", key="save_me_md", type="primary"):
                 me_path.parent.mkdir(parents=True, exist_ok=True)
                 me_path.write_text(new_text, encoding="utf-8")
