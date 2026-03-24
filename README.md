@@ -1,78 +1,160 @@
 # Bewerbungsoptimizer
 
-Ein automatisierter Job-Tracker, der Stellenangebote von Indeed crawlt, in einer MongoDB speichert und mithilfe von KI (Claude API oder lokalem LM Studio) den Fit zwischen Stelle und Lebenslauf analysiert.
+> A personal job application assistant that crawls job postings, analyzes CV fit using LLMs, and tracks the entire application process — all through a self-hosted web dashboard.
+
+---
+
+## What it does
+
+Job hunting generates a lot of noise. This tool cuts through it:
+
+1. **Crawls** Indeed job postings via RSS feeds and a Playwright scraper
+2. **Analyzes** each posting against your CV using an LLM — producing a fit score (0–100 %), level assessment, strengths/gaps, and concrete CV improvement suggestions
+3. **Tracks** the full application lifecycle: applied, response received, interview, rejection
+4. **Maintains a candidate profile** — one-time CV analysis produces a compact profile (~300 tokens) that replaces the raw PDF in every subsequent analysis (~75 % token reduction)
+5. **Integrates GitHub** — scans all public repositories, extracts tools and skills from READMEs, and merges them into the candidate profile
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Backend / CLI | Python 3.12, `asyncio` |
+| Web UI | Streamlit |
+| Database | MongoDB (`pymongo`) |
+| LLM integration | Anthropic Claude API (`claude-opus-4-6`) · OpenAI-compatible (LM Studio) |
+| Web scraping | Playwright (Chromium), `feedparser`, `httpx` |
+| PDF parsing | `pypdf` |
+| Containerization | Docker, Docker Compose |
+| Scheduling | APScheduler |
+| Notifications | `plyer` (desktop), SMTP (email digest) |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  Streamlit Dashboard                 │
+│  Overview · Job List · Analysis · Profile Manager   │
+└────────────────────┬────────────────────────────────┘
+                     │
+        ┌────────────▼────────────┐
+        │        MongoDB          │
+        │  jobs · search_runs     │
+        └──────┬──────────────────┘
+               │
+    ┌──────────┴──────────┐
+    │                     │
+┌───▼────────┐    ┌───────▼──────────────────┐
+│  Fetcher   │    │      LLM Analyzer         │
+│  RSS Feed  │    │  Anthropic Claude API     │
+│  Playwright│    │  or local LM Studio       │
+└────────────┘    │  (OpenAI-compatible)      │
+                  └───────────────────────────┘
+```
+
+**Key design decisions:**
+- **Dual LLM backend** — switches between cloud (Anthropic) and local (LM Studio) via a single config flag; falls back automatically if the local model is unreachable
+- **Candidate profile pattern** — CV is analyzed once; the resulting Markdown profile replaces the raw PDF in all subsequent LLM calls, drastically reducing latency and cost
+- **Schema-less extra fields** — core job data uses a typed dataclass; analysis results (full text, model name, token counts, levels) are stored as extra MongoDB fields without schema migration
+- **Stateless dashboard** — all state lives in MongoDB and `st.session_state`; the Streamlit process can be restarted at any time without data loss
+
+---
 
 ## Features
 
-- **Crawling** – RSS-Feed-Fetcher und Playwright-Scraper für Indeed-Suchergebnisse
-- **Speicherung** – MongoDB mit Duplikaterkennung via GUID/Content-Hash
-- **KI-Analyse** – Abgleich von Stellenausschreibung und Lebenslauf (Claude API oder LM Studio)
-- **Status-Tracking** – Bewerbungsstatus pro Stelle pflegen
-- **Scheduler** – Zeitgesteuerter Crawl (konfigurierbar)
-- **Benachrichtigungen** – Desktop-Notifications und optionale E-Mail-Digests
+**Analysis**
+- Fit score with reasoning (0–100 %)
+- Candidate level vs. required level assessment (Junior / Mid / Senior / Lead)
+- Strengths, gaps, and concrete CV improvement suggestions per job posting
+- Extracts job title and company automatically from the posting text
 
-## Voraussetzungen
+**Candidate profile**
+- One-time LLM analysis of CV + personal notes (`me.md`)
+- Granular skill extraction: programming languages, ML/AI frameworks, databases, tools
+- GitHub integration: fetches READMEs from all public repos, extracts technologies via LLM
+- Editable in the dashboard; profile is used automatically in all analyses
 
-- Python 3.11+
-- MongoDB (lokal oder via Docker)
-- [LM Studio](https://lmstudio.ai/) (optional, für lokale KI-Analyse)
-- Anthropic API Key (optional, für Claude-Analyse)
+**Application tracking**
+- Status pipeline: `new → applied → interview → offer / rejected / withdrawn`
+- Tracks application date, response date, interview invitations, rejection notes
+- Statistics overview: scores, response rates, status distribution
 
-## Installation
+**Infrastructure**
+- Fully containerized with Docker Compose (app + MongoDB)
+- Configurable crawl schedule (time window, weekdays only, interval)
+- Rate limiting on scraper requests (randomized delays)
+
+---
+
+## Getting started
+
+**Requirements:** Docker, or Python 3.12 + MongoDB
 
 ```bash
+# Clone and configure
+cp .env.example .env
+# Edit .env: set ANTHROPIC_API_KEY or point LM_STUDIO_URL to your local instance
+
+# Start everything
+docker compose up -d
+
+# Dashboard
+open http://localhost:8501
+```
+
+**Local development:**
+
+```bash
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
+
+MONGODB_URI=mongodb://localhost:27017/jobtracker \
+  python -m streamlit run dashboard.py
 ```
 
-## Konfiguration
+---
 
-Einstellungen in `config/settings.yaml` anpassen:
+## Configuration
+
+`config/settings.yaml`:
 
 ```yaml
-database:
-  uri: "mongodb://localhost:27017/jobtracker"
-
 analyzer:
-  backend: "lmstudio"       # oder "anthropic"
-  lmstudio_url: "http://localhost:1234/v1"
+  backend: "lmstudio"          # "anthropic" or "lmstudio"
+  lmstudio_url: "http://192.168.1.x:1234/v1"
 
 cv:
-  path: "data/persönliche_informationen/MeinCV.pdf"
+  path: "data/cv.pdf"
+  profile_path: "data/kandidatenprofil.md"   # auto-generated
+
+scheduler:
+  crawl_interval_hours: 2
+  crawl_window_start: 8
+  crawl_window_end: 18
+  crawl_weekdays_only: true
 ```
 
-Umgebungsvariablen (`.env`-Datei):
+---
 
-```env
-MONGODB_URI=mongodb://localhost:27017/jobtracker
-MONGODB_DB=jobtracker
-ANTHROPIC_API_KEY=sk-...       # nur bei backend: anthropic
-EMAIL_PASSWORD=...              # nur bei E-Mail-Benachrichtigungen
+## Project structure
+
 ```
-
-## Docker
-
-```bash
-docker-compose up -d
+├── src/
+│   ├── analyzer/job_matcher.py    # LLM analysis, profile creation, CV improvement
+│   ├── dashboard/streamlit_app.py # Full Streamlit UI
+│   ├── fetcher/                   # RSS + Playwright scrapers
+│   ├── storage/                   # MongoDB models and connection
+│   ├── notifier/                  # Desktop + email notifications
+│   └── scheduler/                 # APScheduler jobs
+├── config/
+│   ├── settings.yaml
+│   └── search_profiles.yaml
+├── main.py                        # CLI entrypoint
+├── dashboard.py                   # Streamlit entrypoint
+├── Dockerfile
+└── docker-compose.yml
 ```
-
-## Verwendung
-
-```bash
-# Einmaliger Crawl aller konfigurierten Suchprofile
-python main.py run
-
-# Stelle mit Playwright scrapen
-python main.py scrape "https://de.indeed.com/jobs?q=..." --name "mein-profil"
-
-# KI-Analyse einer Stelle (Job-ID aus DB, Textdatei oder stdin)
-python main.py analyze <job-id-oder-datei> --cv data/persönliche_informationen/CV.pdf
-
-# Bewerbungsstatus setzen
-python main.py status <job-id> <status>
-
-# Scheduler dauerhaft starten
-python main.py scheduler
-```
-
-Suchprofile werden in `config/search_profiles.yaml` konfiguriert.

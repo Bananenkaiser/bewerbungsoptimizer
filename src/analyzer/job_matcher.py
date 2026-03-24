@@ -57,12 +57,13 @@ Format: „Abschnitt X: [aktuelle Formulierung] → [optimierte Formulierung]" o
 Soll ich mich bewerben? Mit welcher Strategie?"""
 
 
-PROFILE_PROMPT = """Analysiere den folgenden Lebenslauf und erstelle ein kompaktes Kandidatenprofil.
+PROFILE_PROMPT = """Analysiere den folgenden Lebenslauf und extrahiere daraus ein vollständiges Kandidatenprofil.
+WICHTIG: Kürze nichts ab. Liste ALLE genannten Tools, Technologien und Fähigkeiten einzeln auf – jedes Element in einer eigenen Zeile mit Bindestrich.
 
 ## Lebenslauf
 {cv_content}
 {me_section}
-Erstelle das Profil in diesem Format (Markdown):
+Erstelle das Profil exakt in diesem Format (Markdown). Jeder Listenpunkt steht auf einer eigenen Zeile:
 
 ## Kandidatenprofil
 
@@ -73,16 +74,24 @@ Erstelle das Profil in diesem Format (Markdown):
 **Berufserfahrung:** [X Jahre, kurze Zusammenfassung der Stationen]
 
 **Kernkompetenzen:**
-- [Kompetenz 1]
-- [Kompetenz 2]
+- [eine Kompetenz pro Zeile]
 
-**Tools & Technologien:**
-- [Tool/Technologie 1]
-- [Tool/Technologie 2]
+**Programmiersprachen:**
+- [eine Sprache pro Zeile – alle aus dem Lebenslauf]
 
-**Sprachen:** [Programmiersprachen]
+**ML & KI:**
+- [ein Framework/Tool pro Zeile – alle aus dem Lebenslauf]
 
-**Soft Skills & Besonderheiten:** [optional, nur wenn klar erkennbar]"""
+**Daten & Analyse:**
+- [ein Tool pro Zeile]
+
+**Datenbanken:**
+- [eine Datenbank pro Zeile]
+
+**Weitere Tools & Technologien:**
+- [ein Tool pro Zeile – alles was nicht in obige Kategorien passt]
+
+**Soft Skills & Besonderheiten:** [nur wenn klar erkennbar, sonst weglassen]"""
 
 CV_IMPROVEMENT_PROMPT = """Du bist ein erfahrener Karriereberater. Erstelle konkrete, umsetzbare Verbesserungsvorschläge für einen Lebenslauf, um ihn optimal auf die folgende Stelle auszurichten.
 
