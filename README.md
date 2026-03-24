@@ -98,6 +98,9 @@ Job hunting generates a lot of noise. This tool cuts through it:
 cp .env.example .env
 # Edit .env: set ANTHROPIC_API_KEY or point LM_STUDIO_URL to your local instance
 
+cp config/settings.yaml.example config/settings.yaml
+# Edit config/settings.yaml: set lmstudio_url and cv.path
+
 # Start everything
 docker compose up -d
 

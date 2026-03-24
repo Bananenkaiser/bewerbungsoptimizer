@@ -653,8 +653,22 @@ def _render_profil_tab(config: dict) -> None:
             uploaded = st.file_uploader("PDF hochladen", type=["pdf"], key="cv_uploader")
             if uploaded:
                 cv_path.parent.mkdir(parents=True, exist_ok=True)
-                cv_path.write_bytes(uploaded.read())
-                st.success(f"Gespeichert: {cv_path.name}")
+                # Alten Lebenslauf löschen (auch wenn Dateiname sich ändert)
+                for old_pdf in cv_path.parent.glob("*.pdf"):
+                    old_pdf.unlink()
+                new_cv_path = cv_path.parent / uploaded.name
+                new_cv_path.write_bytes(uploaded.read())
+                # settings.yaml aktualisieren falls Dateiname geändert
+                if new_cv_path != cv_path:
+                    settings_path = ROOT / "config/settings.yaml"
+                    settings_text = settings_path.read_text(encoding="utf-8")
+                    new_rel = str(new_cv_path.relative_to(ROOT))
+                    old_rel = str(cv_path.relative_to(ROOT))
+                    settings_path.write_text(
+                        settings_text.replace(old_rel, new_rel), encoding="utf-8"
+                    )
+                    _init.clear()  # Cache leeren damit neue Config geladen wird
+                st.success(f"Gespeichert: {uploaded.name} – alter Lebenslauf gelöscht.")
                 st.session_state["profil_panel"] = None
                 st.rerun()
 
@@ -745,7 +759,7 @@ def _render_profil_tab(config: dict) -> None:
                 st.warning("Bitte zuerst einen Lebenslauf hochladen.")
             else:
                 st.caption("Analysiert Lebenslauf + persönliche Infos einmalig und erzeugt ein kompaktes Profil (~75% weniger Tokens bei Analysen).")
-                col_a, col_b = st.columns(2)
+                col_a, col_b, col_c = st.columns([2, 1, 1])
                 with col_a:
                     if st.button("Profil jetzt erstellen / neu erstellen", type="primary", key="create_profil"):
                         with st.spinner("Analysiere Lebenslauf... (~30 Sekunden)"):
@@ -757,7 +771,23 @@ def _render_profil_tab(config: dict) -> None:
                         st.rerun()
                 if profil_text:
                     with col_b:
-                        st.write("")  # vertical align
+                        st.write("")
+                    with col_c:
+                        if st.button("Profil löschen", key="delete_profil", type="secondary"):
+                            st.session_state["confirm_delete_profil"] = True
+                    if st.session_state.get("confirm_delete_profil"):
+                        st.warning("Profil wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.")
+                        cd1, cd2 = st.columns(2)
+                        with cd1:
+                            if st.button("Ja, löschen", key="confirm_delete_yes", type="primary"):
+                                profile_path.unlink()
+                                st.session_state.pop("confirm_delete_profil", None)
+                                st.session_state["profil_panel"] = None
+                                st.rerun()
+                        with cd2:
+                            if st.button("Abbrechen", key="confirm_delete_no"):
+                                st.session_state.pop("confirm_delete_profil", None)
+                                st.rerun()
                     st.divider()
                     st.caption("Manuell bearbeiten:")
                     edited = st.text_area("Rohtext", value=profil_text, height=350, key="profil_editor")

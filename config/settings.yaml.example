@@ -1,18 +1,20 @@
-# Indeed Job Tracker – Hauptkonfiguration
+# Bewerbungsoptimizer – Konfiguration
+# Kopiere diese Datei: cp config/settings.yaml.example config/settings.yaml
+# Passe die Werte für dein Setup an.
 
 database:
   uri: "mongodb://localhost:27017/jobtracker"   # lokal; im Container via .env überschrieben
   name: "jobtracker"
 
 cv:
-  path: "data/persönliche_informationen/Dominik-Tisleric-CV.pdf"
+  path: "data/persönliche_informationen/MeinCV.pdf"
   me_path: "data/persönliche_informationen/me.md"
   profile_path: "data/persönliche_informationen/kandidatenprofil.md"
 
 analyzer:
   # "anthropic" = Claude API | "lmstudio" = lokales LM Studio
   backend: "lmstudio"
-  lmstudio_url: "http://192.168.178.47:1234/v1"
+  lmstudio_url: "http://<LM-STUDIO-HOST>:1234/v1"
   lmstudio_model: "local-model"   # Name des geladenen Modells in LM Studio
 
 scheduler:

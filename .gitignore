@@ -36,6 +36,9 @@ data/mongodb/
 data/persönliche_informationen/
 PLAN.md
 
+# Lokale Konfiguration (enthält gerätespezifische IPs und Pfade)
+config/settings.yaml
+
 # IDE
 .vscode/
 .idea/
