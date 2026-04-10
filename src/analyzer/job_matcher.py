@@ -5,10 +5,26 @@ from __future__ import annotations
 import base64
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _anthropic_create_with_retry(create_fn, *args, max_retries: int = 3, **kwargs):
+    """Ruft eine Anthropic API-Funktion mit Retry bei 529 (Overloaded) auf."""
+    import anthropic
+    for attempt in range(max_retries):
+        try:
+            return create_fn(*args, **kwargs)
+        except anthropic.APIStatusError as exc:
+            if exc.status_code == 529 and attempt < max_retries - 1:
+                wait = 2 ** attempt
+                logger.warning("Anthropic überlastet (529), Versuch %d/%d – warte %ds.", attempt + 1, max_retries, wait)
+                time.sleep(wait)
+            else:
+                raise
 
 # Standardmodelle
 ANTHROPIC_MODEL = "claude-opus-4-6"
@@ -180,6 +196,172 @@ Für jede Schwäche: konkrete Stelle im Lebenslauf benennen und eine verbesserte
 #### Muster-Eröffnungssatz
 [Ein konkreter Beispielsatz als Vorlage]"""
 
+IMP_CV_PROMPT = """Du bist ein erfahrener Karriereberater. Analysiere ausschließlich den Lebenslauf-Aspekt des folgenden Kandidatenprofils.
+
+## Kandidatenprofil
+{profile_content}
+
+Antworte nur mit diesem Abschnitt – kein Präambel, keine anderen Themen.
+
+## Lebenslauf-Optimierungen
+
+### Stärken (was bereits gut präsentiert ist)
+- [konkrete Stärke mit Begründung]
+
+### Kritische Verbesserungen
+Für jede Schwäche: zeige die exakte Stelle und eine verbesserte Version.
+- **[Bereich]:** „[aktuelle Formulierung oder fehlendes Element]" → „[optimierte Version]"
+
+### Fehlende Elemente für typische {field}-Stellen
+- [was in diesem Fachbereich erwartet wird, aber im Profil fehlt]
+
+### Struktur & Formatierung
+- [Hinweise zu Abschnittsreihenfolge, Länge, Lesbarkeit, ATS-Kompatibilität]"""
+
+IMP_PROJECTS_PROMPT = """Du bist ein erfahrener Senior-Entwickler und Karriereberater. Analysiere das folgende Kandidatenprofil und empfehle konkrete Projekte.
+
+## Kandidatenprofil
+{profile_content}
+
+Antworte nur mit diesem Abschnitt – kein Präambel, keine anderen Themen.
+
+## Projektempfehlungen
+
+### Kurzfristige Projekte — sofortiger Lebenslauf-Mehrwert (1–4 Wochen)
+Für jeden Vorschlag: was das Projekt demonstriert, welche Lücke es schließt, konkreter Stack.
+
+1. **[Projektname]**
+   - **Ziel:** [was das Projekt demonstriert]
+   - **Stack:** [konkrete Technologien]
+   - **Aufwand:** [z.B. 1–2 Wochen]
+   - **Schließt Lücke:** [welche fehlende Fähigkeit wird nachgewiesen]
+
+### Mittelfristige Projekte (1–3 Monate)
+
+2. **[Projektname]**
+   - **Ziel:** ...
+   - **Stack:** ...
+   - **Aufwand:** ...
+   - **Schließt Lücke:** ...
+
+### Langfristige Projekte (3+ Monate)
+
+3. **[Projektname]**
+   - **Ziel:** ...
+   - **Stack:** ...
+   - **Aufwand:** ...
+   - **Schließt Lücke:** ..."""
+
+IMP_GITHUB_PROMPT = """Du bist ein erfahrener Senior-Entwickler. Analysiere das folgende Kandidatenprofil mit besonderem Fokus auf das GitHub-Portfolio.
+
+## Kandidatenprofil
+{profile_content}
+
+Antworte nur mit diesem Abschnitt – kein Präambel, keine anderen Themen.
+
+## GitHub-Portfolio-Analyse
+
+### Stärken des aktuellen Portfolios
+- [was bereits gut ist und Stärken zeigt]
+
+### Sofortige Maßnahmen ohne neuen Code
+Dinge die man heute noch tun kann um das Portfolio besser wirken zu lassen:
+- [z.B. README verbessern, Repo-Beschreibung ergänzen, Topics setzen, Repos anpinnen, archived Repos aufräumen]
+
+### Repositories die ausgebaut werden sollten
+- **[Repo/Thema]:** [was konkret hinzugefügt oder verbessert werden sollte und warum]
+
+### Fehlende Repository-Typen für ein starkes {field}-Portfolio
+- **[Fehlender Typ]:** [warum wichtig, konkreter Vorschlag]
+
+### README-Qualität
+Wie sollte ein typisches README in diesem Portfolio aufgebaut sein? Zeige eine konkrete Vorlage."""
+
+IMP_SKILLS_PROMPT = """Du bist ein erfahrener Karriereberater mit Fokus auf den IT/Tech-Markt. Analysiere das folgende Kandidatenprofil auf Skill-Gaps.
+
+## Kandidatenprofil
+{profile_content}
+
+Antworte nur mit diesem Abschnitt – kein Präambel, keine anderen Themen.
+
+## Skill-Gaps & Lernempfehlungen
+
+### Technologien mit dem höchsten Marktwert für dieses Profil
+
+| Technologie | Priorität | Warum relevant | Einstiegspunkt |
+|---|---|---|---|
+| [Tech] | Hoch / Mittel / Niedrig | [kurze Begründung] | [Kurs, Doku, Tutorial-Link] |
+
+### Zertifizierungen die sich lohnen würden
+- **[Zertifikat – voller Name]:** [warum relevant für dieses Profil, Anbieter, ca. Aufwand und Kosten]
+
+### Lernpfad-Empfehlung
+In welcher Reihenfolge sollten die wichtigsten Lücken geschlossen werden?
+1. [Schritt 1 – warum zuerst]
+2. [Schritt 2]
+3. [Schritt 3]"""
+
+IMP_JOBPORTALS_PROMPT = """Du bist ein erfahrener Karriereberater mit Fokus auf Jobportal-Optimierung (Indeed, LinkedIn, XING, StepStone). Analysiere das folgende Kandidatenprofil.
+
+## Kandidatenprofil
+{profile_content}
+
+Antworte nur mit diesem Abschnitt – kein Präambel, keine anderen Themen.
+
+## Jobportal-Profil-Optimierung
+
+### Skills / Fähigkeiten hinzufügen
+Die wichtigsten Skills priorisiert nach Marktnachfrage. Maximal 20, die wirklich relevant sind.
+- **[Skill – exakt so wie auf dem Portal eingeben]** — [warum dieser Begriff wichtig für Algorithmen ist]
+
+### Ausbildung / Education
+Was sollte im Bildungsabschnitt eingetragen werden? Empfohlene Formulierungen.
+- **[Abschluss/Kurs]:** [empfohlene Formulierung für maximale Sichtbarkeit]
+
+### Lizenzen & Zertifikate / Licenses & Certifications
+- **Vorhanden → jetzt eintragen:** [Zertifikat – genauer Name wie er auf dem Portal erscheinen sollte]
+- **Empfohlen → erwerben:** [Zertifikat – warum und wo, Link wenn möglich]
+
+### Sprachen / Languages
+- **[Sprache]:** [Niveau: Native / Full Professional / Professional Working / Limited Working]
+
+### Letzte Berufserfahrung / Most Recent Work Experience
+Wie sollte die relevanteste Position formuliert werden für maximale Algorithmus-Trefferquote?
+- **Jobtitel (empfohlen):** [keyword-optimierter Titel – kann vom offiziellen Titel abweichen]
+- **Beschreibung (2–3 Sätze):** [keyword-reicher Text für Portal-Algorithmen]
+- **Wichtigste Keywords:** [Begriffe die unbedingt in Titel oder Beschreibung vorkommen sollten]
+
+### Job-Alerts & Suchbegriffe einrichten
+Konkrete Suchbegriffe die als Job-Alert auf den Portalen eingerichtet werden sollten:
+- [Suchbegriff mit Begründung]"""
+
+IMP_PLAN_PROMPT = """Du bist ein erfahrener Karriereberater. Erstelle auf Basis des folgenden Kandidatenprofils einen konkreten, umsetzbaren 90-Tage-Aktionsplan.
+
+## Kandidatenprofil
+{profile_content}
+
+Antworte nur mit diesem Abschnitt – kein Präambel, keine anderen Themen.
+
+## 90-Tage-Aktionsplan
+
+### Woche 1–2: Sofortmaßnahmen (Quick Wins)
+Dinge die sofort umsetzbar sind und schnell Wirkung zeigen.
+- [ ] [konkrete Aufgabe – so spezifisch wie möglich]
+
+### Monat 1: Kurzfristige Ziele
+- [ ] [konkrete Aufgabe]
+
+### Monat 2: Aufbauphase
+- [ ] [konkrete Aufgabe]
+
+### Monat 3: Konsolidierung & Sichtbarkeit
+- [ ] [konkrete Aufgabe]
+
+### Erfolgsmessung
+Woran erkennst du, dass der Plan funktioniert?
+- [messbares Kriterium]"""
+
+
 GITHUB_PROMPT = """Analysiere die folgenden GitHub-Projekte eines Entwicklers und extrahiere daraus ein vollständiges Bild seiner technischen Fähigkeiten.
 
 ## GitHub-Projekte (READMEs)
@@ -321,7 +503,7 @@ def _analyze_with_anthropic(
         print()
         with client.messages.stream(
             model=ANTHROPIC_MODEL,
-            max_tokens=4096,
+            max_tokens=8192,
             thinking={"type": "adaptive"},
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
@@ -336,9 +518,10 @@ def _analyze_with_anthropic(
             output_tokens = final.usage.output_tokens
         print()
     else:
-        response = client.messages.create(
+        response = _anthropic_create_with_retry(
+            client.messages.create,
             model=ANTHROPIC_MODEL,
-            max_tokens=4096,
+            max_tokens=8192,
             thinking={"type": "adaptive"},
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
@@ -391,7 +574,7 @@ def _analyze_with_lmstudio(
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=4096,
+            max_tokens=8192,
             stream=True,
         )
         for chunk in stream:
@@ -407,7 +590,7 @@ def _analyze_with_lmstudio(
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            max_tokens=4096,
+            max_tokens=8192,
         )
         full_text = response.choices[0].message.content or ""
         if response.usage:
@@ -442,7 +625,8 @@ def _call_llm(prompt: str, config: dict | None) -> str:
 
     import anthropic
     client = anthropic.Anthropic()
-    response = client.messages.create(
+    response = _anthropic_create_with_retry(
+        client.messages.create,
         model=ANTHROPIC_MODEL,
         max_tokens=2048,
         system=SYSTEM_PROMPT,
@@ -487,6 +671,42 @@ def suggest_general_improvements(profile_path: Path, config: dict | None) -> str
     field = field_match.group(1).strip() if field_match else "IT/Data-Science"
     prompt = GENERAL_IMPROVEMENT_PROMPT.format(profile_content=profile_text, field=field)
     return _call_llm(prompt, config)
+
+
+def _profile_and_field(profile_path: Path) -> tuple[str, str]:
+    profile_text = profile_path.read_text(encoding="utf-8")
+    m = re.search(r"\*\*Fachgebiet:\*\*\s*(.+)", profile_text)
+    return profile_text, m.group(1).strip() if m else "IT/Data-Science"
+
+
+def analyze_cv_improvements(profile_path: Path, config: dict | None) -> str:
+    profile_text, field = _profile_and_field(profile_path)
+    return _call_llm(IMP_CV_PROMPT.format(profile_content=profile_text, field=field), config)
+
+
+def analyze_project_improvements(profile_path: Path, config: dict | None) -> str:
+    profile_text, field = _profile_and_field(profile_path)
+    return _call_llm(IMP_PROJECTS_PROMPT.format(profile_content=profile_text, field=field), config)
+
+
+def analyze_github_improvements(profile_path: Path, config: dict | None) -> str:
+    profile_text, field = _profile_and_field(profile_path)
+    return _call_llm(IMP_GITHUB_PROMPT.format(profile_content=profile_text, field=field), config)
+
+
+def analyze_skill_gaps(profile_path: Path, config: dict | None) -> str:
+    profile_text, field = _profile_and_field(profile_path)
+    return _call_llm(IMP_SKILLS_PROMPT.format(profile_content=profile_text, field=field), config)
+
+
+def analyze_jobportal_tips(profile_path: Path, config: dict | None) -> str:
+    profile_text, _ = _profile_and_field(profile_path)
+    return _call_llm(IMP_JOBPORTALS_PROMPT.format(profile_content=profile_text), config)
+
+
+def analyze_action_plan(profile_path: Path, config: dict | None) -> str:
+    profile_text, _ = _profile_and_field(profile_path)
+    return _call_llm(IMP_PLAN_PROMPT.format(profile_content=profile_text), config)
 
 
 def extract_github_skills(readme_text: str, config: dict | None) -> str:
@@ -582,7 +802,8 @@ def analyze_job(
                 logger.warning("LM Studio fehlgeschlagen (%s) – Fallback auf Anthropic.", exc)
                 import anthropic as _ac
                 client_an = _ac.Anthropic()
-                resp = client_an.messages.create(
+                resp = _anthropic_create_with_retry(
+                    client_an.messages.create,
                     model=ANTHROPIC_MODEL, max_tokens=4096,
                     thinking={"type": "adaptive"},
                     system=SYSTEM_PROMPT,
@@ -618,7 +839,8 @@ def analyze_job(
                     output_tokens = final.usage.output_tokens
                 print()
             else:
-                resp = client_an.messages.create(
+                resp = _anthropic_create_with_retry(
+                    client_an.messages.create,
                     model=ANTHROPIC_MODEL, max_tokens=4096,
                     thinking={"type": "adaptive"},
                     system=SYSTEM_PROMPT,

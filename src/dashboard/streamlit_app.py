@@ -16,7 +16,20 @@ ROOT = Path(__file__).parent.parent.parent
 
 load_dotenv(ROOT / ".env")
 
-from src.analyzer.job_matcher import AnalysisResult, analyze_job, create_candidate_profile, extract_github_skills, suggest_cv_improvements, suggest_general_improvements
+from src.analyzer.job_matcher import (
+    AnalysisResult,
+    analyze_action_plan,
+    analyze_cv_improvements,
+    analyze_github_improvements,
+    analyze_job,
+    analyze_jobportal_tips,
+    analyze_project_improvements,
+    analyze_skill_gaps,
+    create_candidate_profile,
+    extract_github_skills,
+    suggest_cv_improvements,
+    suggest_general_improvements,
+)
 from src.storage.database import JOBS_COLLECTION, get_session, init_db
 from src.storage.models import Job, JobStatus
 
@@ -146,16 +159,20 @@ def _render_analyse_tab(config: dict) -> None:
             profile_path = ROOT / profile_str if profile_str else None
 
             with st.spinner("KI-Analyse läuft... (kann 30–120 Sekunden dauern)"):
-                result = analyze_job(
-                    job_description=description,
-                    cv_path=cv_path,
-                    me_path=me_path,
-                    job_title=job_title,
-                    company=company,
-                    stream_output=False,
-                    config=config,
-                    profile_path=profile_path,
-                )
+                try:
+                    result = analyze_job(
+                        job_description=description,
+                        cv_path=cv_path,
+                        me_path=me_path,
+                        job_title=job_title,
+                        company=company,
+                        stream_output=False,
+                        config=config,
+                        profile_path=profile_path,
+                    )
+                except Exception as e:
+                    st.error(f"Analyse fehlgeschlagen: {e}")
+                    st.stop()
             _save_job(result, description)
             st.session_state["analysis_result"] = result
             st.session_state["analysis_done"] = True
@@ -188,12 +205,15 @@ def _render_analyse_tab(config: dict) -> None:
         if profile_path_opt and profile_path_opt.exists():
             if st.button("Optimierungsvorschläge generieren", key="cv_improve_btn", type="primary"):
                 with st.spinner("Erstelle Optimierungsvorschläge... (~30 Sekunden)"):
-                    improvements = suggest_cv_improvements(
-                        st.session_state.get("input_description", ""),
-                        profile_path_opt,
-                        config,
-                    )
-                st.session_state["cv_improvements"] = improvements
+                    try:
+                        improvements = suggest_cv_improvements(
+                            st.session_state.get("input_description", ""),
+                            profile_path_opt,
+                            config,
+                        )
+                        st.session_state["cv_improvements"] = improvements
+                    except Exception as e:
+                        st.error(f"Optimierungsvorschläge fehlgeschlagen: {e}")
 
             if st.session_state.get("cv_improvements"):
                 st.markdown(st.session_state["cv_improvements"])
@@ -416,63 +436,75 @@ def _render_stellen_tab() -> None:
         st.success("Bewerbungsverlauf gespeichert.")
         st.rerun()
 
-    # Neu analysieren
     description = doc.get("description", "")
-    if description:
-        st.divider()
-        col_reanalyse, col_info = st.columns([2, 3])
-        with col_reanalyse:
-            if st.button("Mit aktuellem Profil neu analysieren", key=f"reanalyse_{jid}", type="primary"):
-                config = _init()
-                cv_cfg = config.get("cv", {})
-                cv_path = ROOT / cv_cfg.get("path", "")
-                me_path_str = cv_cfg.get("me_path", "")
-                me_path = ROOT / me_path_str if me_path_str else None
-                profile_str = cv_cfg.get("profile_path", "")
-                profile_path = ROOT / profile_str if profile_str else None
-                with st.spinner("KI-Analyse läuft... (kann 30–120 Sekunden dauern)"):
-                    result = analyze_job(
-                        job_description=description,
-                        cv_path=cv_path,
-                        me_path=me_path,
-                        job_title=doc.get("title", ""),
-                        company=doc.get("company", ""),
-                        stream_output=False,
-                        config=config,
-                        profile_path=profile_path if (profile_path and profile_path.exists()) else None,
-                    )
-                # Ergebnis in DB überschreiben
-                with get_session() as db:
-                    db[JOBS_COLLECTION].update_one(
-                        {"_id": doc["_id"]},
-                        {"$set": {
-                            "score": float(result.fit_score) if result.fit_score >= 0 else None,
-                            "full_analysis": result.full_analysis,
-                            "model_used": result.model_used,
-                            "input_tokens": result.input_tokens,
-                            "output_tokens": result.output_tokens,
-                            "candidate_level": result.candidate_level,
-                            "job_level": result.job_level,
-                        }},
-                    )
-                st.success(f"Neu analysiert – Score: {result.fit_score}%")
-                st.rerun()
-        with col_info:
-            config = _init()
-            profile_str = config.get("cv", {}).get("profile_path", "")
-            profile_path = ROOT / profile_str if profile_str else None
-            if profile_path and profile_path.exists():
-                st.caption("Verwendet das aktuelle Kandidatenprofil.")
-            else:
-                st.caption("Kein Kandidatenprofil vorhanden – Analyse nutzt den rohen Lebenslauf.")
-
     full_analysis = doc.get("full_analysis")
-    if full_analysis:
-        st.markdown("### Analyse")
-        st.markdown(full_analysis)
-    elif description:
-        with st.expander("Stellenbeschreibung"):
-            st.text(description[:3000])
+
+    tab_beschreibung, tab_analyse = st.tabs(["Stellenbeschreibung", "Profilanalyse"])
+
+    with tab_beschreibung:
+        if description:
+            st.text(description)
+        else:
+            st.info("Keine Stellenausschreibung gespeichert.")
+
+    with tab_analyse:
+        if description:
+            col_reanalyse, col_info = st.columns([2, 3])
+            with col_reanalyse:
+                if st.button("Mit aktuellem Profil neu analysieren", key=f"reanalyse_{jid}", type="primary"):
+                    config = _init()
+                    cv_cfg = config.get("cv", {})
+                    cv_path = ROOT / cv_cfg.get("path", "")
+                    me_path_str = cv_cfg.get("me_path", "")
+                    me_path = ROOT / me_path_str if me_path_str else None
+                    profile_str = cv_cfg.get("profile_path", "")
+                    profile_path = ROOT / profile_str if profile_str else None
+                    with st.spinner("KI-Analyse läuft... (kann 30–120 Sekunden dauern)"):
+                        try:
+                            result = analyze_job(
+                                job_description=description,
+                                cv_path=cv_path,
+                                me_path=me_path,
+                                job_title=doc.get("title", ""),
+                                company=doc.get("company", ""),
+                                stream_output=False,
+                                config=config,
+                                profile_path=profile_path if (profile_path and profile_path.exists()) else None,
+                            )
+                        except Exception as e:
+                            st.error(f"Analyse fehlgeschlagen: {e}")
+                            st.stop()
+                    with get_session() as db:
+                        db[JOBS_COLLECTION].update_one(
+                            {"_id": doc["_id"]},
+                            {"$set": {
+                                "score": float(result.fit_score) if result.fit_score >= 0 else None,
+                                "full_analysis": result.full_analysis,
+                                "model_used": result.model_used,
+                                "input_tokens": result.input_tokens,
+                                "output_tokens": result.output_tokens,
+                                "candidate_level": result.candidate_level,
+                                "job_level": result.job_level,
+                            }},
+                        )
+                    st.success(f"Neu analysiert – Score: {result.fit_score}%")
+                    st.rerun()
+            with col_info:
+                config = _init()
+                profile_str = config.get("cv", {}).get("profile_path", "")
+                profile_path = ROOT / profile_str if profile_str else None
+                if profile_path and profile_path.exists():
+                    st.caption("Verwendet das aktuelle Kandidatenprofil.")
+                else:
+                    st.caption("Kein Kandidatenprofil vorhanden – Analyse nutzt den rohen Lebenslauf.")
+
+        if full_analysis:
+            st.divider()
+            st.markdown(full_analysis)
+        elif not description:
+            st.info("Keine Analyse vorhanden.")
+        else:
+            st.info("Noch keine Analyse vorhanden. Klicke auf 'Mit aktuellem Profil neu analysieren'.")
 
 
 def _parse_profile(text: str) -> dict:
@@ -740,10 +772,12 @@ def _render_profil_tab(config: dict) -> None:
 
     elif active == "github":
         with st.container(border=True):
-            if not profil_text:
-                st.warning("Bitte zuerst ein Kandidatenprofil erstellen.")
+            if not cv_path.exists():
+                st.warning("Bitte zuerst einen Lebenslauf hochladen.")
             else:
                 st.caption("Alle öffentlichen Repositories durchsuchen und Skills ins Profil einbinden.")
+                if not profil_text:
+                    st.info("Beim Extrahieren wird automatisch ein Kandidatenprofil aus Lebenslauf + persönlichen Infos erstellt.")
                 github_input = st.text_input(
                     "GitHub-Benutzername oder URL",
                     placeholder="Bananenkaiser  oder  https://github.com/Bananenkaiser",
@@ -799,7 +833,13 @@ def _render_profil_tab(config: dict) -> None:
                                         if not skills_text.strip():
                                             st.warning("KI hat keine Skills extrahiert (leere Antwort).")
                                         else:
-                                            profile_path.write_text(profil_text + "\n\n" + skills_text, encoding="utf-8")
+                                            if profil_text:
+                                                base_profil = profil_text
+                                            else:
+                                                with st.spinner("Erstelle Kandidatenprofil aus Lebenslauf + persönlichen Infos... (~30 Sekunden)"):
+                                                    base_profil = create_candidate_profile(cv_path, me_path if me_path.exists() else None, config)
+                                            profile_path.parent.mkdir(parents=True, exist_ok=True)
+                                            profile_path.write_text(base_profil + "\n\n" + skills_text, encoding="utf-8")
                                             # Erfolgsmeldung in session_state speichern – überlebt st.rerun()
                                             st.session_state["github_success"] = f"GitHub-Skills aus {fetched} Repositories eingebunden."
                                             st.session_state["profil_panel"] = None
@@ -866,13 +906,142 @@ def _render_profil_tab(config: dict) -> None:
         st.subheader("Allgemeine Verbesserungsvorschläge")
         if st.button("Verbesserungsvorschläge generieren", key="btn_general_improvements"):
             with st.spinner("Analysiere Profil …"):
-                result = suggest_general_improvements(profile_path, config)
-                st.session_state["general_improvements"] = result
+                try:
+                    result = suggest_general_improvements(profile_path, config)
+                    st.session_state["general_improvements"] = result
+                except Exception as e:
+                    st.error(f"Verbesserungsvorschläge fehlgeschlagen: {e}")
         if st.session_state.get("general_improvements"):
             st.markdown(st.session_state["general_improvements"])
     else:
         st.divider()
         st.info("Noch keine Informationen extrahiert. Lebenslauf hochladen und Profil erstellen.")
+
+
+def _imp_subtab(
+    label: str,
+    cache_path: Path,
+    analyze_fn,
+    profile_path: Path,
+    config: dict,
+    spinner_text: str,
+    file_name: str,
+) -> None:
+    """Gemeinsame Render-Logik für jeden Verbesserungs-Untertab."""
+    saved = cache_path.read_text(encoding="utf-8") if cache_path.exists() else None
+
+    col_btn, col_meta = st.columns([2, 3])
+    with col_btn:
+        btn_label = f"{label} neu generieren" if saved else f"{label} generieren"
+        run = st.button(btn_label, type="primary", use_container_width=True, key=f"imp_btn_{file_name}")
+    with col_meta:
+        if saved:
+            mtime = datetime.fromtimestamp(cache_path.stat().st_mtime).strftime("%d.%m.%Y %H:%M")
+            st.caption(f"Zuletzt generiert: {mtime}")
+            st.download_button(
+                "Markdown herunterladen",
+                data=saved.encode("utf-8"),
+                file_name=file_name,
+                mime="text/markdown",
+                use_container_width=True,
+                key=f"imp_dl_{file_name}",
+            )
+
+    if run:
+        with st.spinner(spinner_text):
+            try:
+                saved = analyze_fn(profile_path, config)
+            except Exception as e:
+                st.error(f"Analyse fehlgeschlagen: {e}")
+                return
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(saved, encoding="utf-8")
+        st.success("Gespeichert.")
+
+    if saved:
+        st.divider()
+        st.markdown(saved)
+
+
+def _render_verbesserungen_tab(config: dict) -> None:
+    cv_cfg = config.get("cv", {})
+    profile_str = cv_cfg.get("profile_path", "")
+    profile_path = ROOT / profile_str if profile_str else None
+
+    if not profile_path or not profile_path.exists():
+        st.info("Kein Kandidatenprofil vorhanden. Bitte zuerst im Tab 'Mein Profil' ein Profil erstellen.")
+        return
+
+    def _p(key: str, default: str) -> Path:
+        return ROOT / cv_cfg.get(key, default)
+
+    subtabs = st.tabs(["Lebenslauf", "Projekte", "GitHub-Portfolio", "Skills", "Jobportale", "90-Tage-Plan"])
+
+    with subtabs[0]:
+        _imp_subtab(
+            label="Lebenslauf-Analyse",
+            cache_path=_p("imp_cv_path", "data/persönliche_informationen/verbesserungen_lebenslauf.md"),
+            analyze_fn=analyze_cv_improvements,
+            profile_path=profile_path,
+            config=config,
+            spinner_text="Analysiere Lebenslauf... (~30 Sekunden)",
+            file_name="verbesserungen_lebenslauf.md",
+        )
+
+    with subtabs[1]:
+        _imp_subtab(
+            label="Projektempfehlungen",
+            cache_path=_p("imp_projects_path", "data/persönliche_informationen/verbesserungen_projekte.md"),
+            analyze_fn=analyze_project_improvements,
+            profile_path=profile_path,
+            config=config,
+            spinner_text="Erstelle Projektempfehlungen... (~30 Sekunden)",
+            file_name="verbesserungen_projekte.md",
+        )
+
+    with subtabs[2]:
+        _imp_subtab(
+            label="GitHub-Portfolio-Analyse",
+            cache_path=_p("imp_github_path", "data/persönliche_informationen/verbesserungen_github.md"),
+            analyze_fn=analyze_github_improvements,
+            profile_path=profile_path,
+            config=config,
+            spinner_text="Analysiere GitHub-Portfolio... (~30 Sekunden)",
+            file_name="verbesserungen_github.md",
+        )
+
+    with subtabs[3]:
+        _imp_subtab(
+            label="Skill-Gap-Analyse",
+            cache_path=_p("imp_skills_path", "data/persönliche_informationen/verbesserungen_skills.md"),
+            analyze_fn=analyze_skill_gaps,
+            profile_path=profile_path,
+            config=config,
+            spinner_text="Analysiere Skill-Gaps... (~30 Sekunden)",
+            file_name="verbesserungen_skills.md",
+        )
+
+    with subtabs[4]:
+        _imp_subtab(
+            label="Jobportal-Optimierung",
+            cache_path=_p("imp_jobportals_path", "data/persönliche_informationen/verbesserungen_jobportale.md"),
+            analyze_fn=analyze_jobportal_tips,
+            profile_path=profile_path,
+            config=config,
+            spinner_text="Erstelle Jobportal-Empfehlungen... (~30 Sekunden)",
+            file_name="verbesserungen_jobportale.md",
+        )
+
+    with subtabs[5]:
+        _imp_subtab(
+            label="90-Tage-Aktionsplan",
+            cache_path=_p("imp_plan_path", "data/persönliche_informationen/verbesserungen_aktionsplan.md"),
+            analyze_fn=analyze_action_plan,
+            profile_path=profile_path,
+            config=config,
+            spinner_text="Erstelle Aktionsplan... (~30 Sekunden)",
+            file_name="verbesserungen_aktionsplan.md",
+        )
 
 
 def main() -> None:
@@ -894,8 +1063,8 @@ def main() -> None:
     if "cv_improvements" not in st.session_state:
         st.session_state["cv_improvements"] = None
 
-    tab_statistik, tab_stellen, tab_analyse, tab_profil = st.tabs(
-        ["Übersicht", "Gespeicherte Stellen", "Analyse", "Mein Profil"]
+    tab_statistik, tab_stellen, tab_analyse, tab_profil, tab_verbesserungen = st.tabs(
+        ["Übersicht", "Gespeicherte Stellen", "Analyse", "Mein Profil", "Verbesserungen"]
     )
 
     with tab_statistik:
@@ -909,3 +1078,9 @@ def main() -> None:
 
     with tab_profil:
         _render_profil_tab(config)
+
+    with tab_verbesserungen:
+        _render_verbesserungen_tab(config)
+
+
+main()
