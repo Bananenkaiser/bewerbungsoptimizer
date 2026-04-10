@@ -442,16 +442,17 @@ def _render_stellen_tab() -> None:
 
     description = doc.get("description", "")
     full_analysis = doc.get("full_analysis")
+    fit_score = doc.get("score")
 
-    tab_beschreibung, tab_analyse = st.tabs(["Stellenbeschreibung", "Profilanalyse"])
-
-    with tab_beschreibung:
+    # ── Stellenbeschreibung (standardmäßig eingeklappt) ─────────────────────
+    with st.expander("Stellenbeschreibung", expanded=False):
         if description:
             st.text(description)
         else:
             st.info("Keine Stellenausschreibung gespeichert.")
 
-    with tab_analyse:
+    # ── Analyse ─────────────────────────────────────────────────────────────
+    with st.expander("Analyse", expanded=True):
         if description:
             col_reanalyse, col_info = st.columns([2, 3])
             with col_reanalyse:
@@ -501,6 +502,10 @@ def _render_stellen_tab() -> None:
                     st.caption("Verwendet das aktuelle Kandidatenprofil.")
                 else:
                     st.caption("Kein Kandidatenprofil vorhanden – Analyse nutzt den rohen Lebenslauf.")
+
+        if fit_score is not None:
+            st.divider()
+            _render_score(fit_score)
 
         if full_analysis:
             st.divider()
